@@ -1,0 +1,65 @@
+# 1. Định nghĩa các Entity (Giống với class Java)
+type Category {
+    categoryId: ID!
+    categoryName: String!
+    icon: String
+    products: [Product]
+}
+
+type Product {
+    productId: ID!
+    productName: String!
+    unitPrice: Float
+    discount: Float
+    description: String
+    images: String
+    quantity: Int
+    status: Int
+    category: Category
+}
+
+# 2. Định nghĩa Input để nhận dữ liệu từ Frontend gửi lên (Mutation)
+input CategoryInput {
+    categoryId: ID
+    categoryName: String!
+    icon: String
+}
+
+input ProductInput {
+    productId: ID
+    productName: String!
+    unitPrice: Float
+    discount: Float
+    description: String
+    images: String
+    quantity: Int
+    status: Int
+    categoryId: ID!
+}
+
+# 3. Định nghĩa các hàm LẤY DỮ LIỆU (Theo đúng yêu cầu của thầy)
+type Query {
+    # Bảng Category
+    getAllCategories: [Category]
+    getCategoryById(categoryId: ID!): Category
+
+    # Bảng Product
+    getAllProducts: [Product]
+    getProductById(productId: ID!): Product
+    
+    # Các hàm đặc biệt cho Mục 5
+    getProductsSortedByPrice: [Product]
+    getProductsByCategoryId(categoryId: ID!): [Product]
+    searchProducts(keyword: String!): [Product]
+}
+
+# 4. Định nghĩa các hàm THAY ĐỔI DỮ LIỆU (CRUD)
+type Mutation {
+    createCategory(category: CategoryInput!): Category
+    updateCategory(category: CategoryInput!): Category
+    deleteCategory(categoryId: ID!): String
+
+    createProduct(product: ProductInput!): Product
+    updateProduct(product: ProductInput!): Product
+    deleteProduct(productId: ID!): String
+}

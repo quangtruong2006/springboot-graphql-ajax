@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>Quản Trị GraphQL</title>
+<link
+	href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+	rel="stylesheet">
+<link
+	href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"
+	rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script
+	src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script
+	src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script
+	src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body class="bg-light">
+
+	<nav class="navbar navbar-expand-lg navbar-dark bg-danger mb-4">
+		<div class="container-fluid px-5">
+			<a class="navbar-brand fw-bold" href="/admin">⚙️ GraphQL Admin
+				Panel</a>
+			<div>
+				<!-- Thêm nút sang trang Category -->
+				<a href="/admin-category" class="btn btn-success btn-sm me-2">Quản
+					lý Category</a> <a href="/" class="btn btn-light btn-sm">Quay lại
+					Trang Chủ</a>
+			</div>
+		</div>
+	</nav>
+
+	<div class="container-fluid px-5">
+		<div class="card shadow-sm">
+			<div
+				class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+				<h4 class="mb-0 text-danger fw-bold">Quản lý Sản phẩm (Phân
+					trang & Tìm kiếm)</h4>
+				<button class="btn btn-success" data-bs-toggle="modal"
+					data-bs-target="#modalProduct" onclick="openAddModal()">+
+					Thêm Sản phẩm</button>
+			</div>
+			<div class="card-body">
+				<table id="productTable"
+					class="table table-bordered table-hover align-middle text-center w-100">
+					<thead class="table-dark">
+						<tr>
+							<th>ID</th>
+							<th>Hình ảnh</th>
+							<th>Tên sản phẩm</th>
+							<th>Giá bán</th>
+							<th>Số lượng</th>
+							<th>Thao tác</th>
+						</tr>
+					</thead>
+					<tbody id="product-tbody"></tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+
+	<!-- ============================================== -->
+	<!-- MODAL THÊM / SỬA SẢN PHẨM -->
+	<!-- ============================================== -->
+	<div class="modal fade" id="modalProduct" tabindex="-1">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header bg-danger text-white">
+					<h5 class="modal-title" id="modalTitle">Thêm Sản Phẩm</h5>
+					<button type="button" class="btn-close btn-close-white"
+						data-bs-dismiss="modal"></button>
+				</div>
+				<div class="modal-body">
+					<form id="formProduct">
+						<input type="hidden" id="proId">
+						<div class="mb-3">
+							<label class="form-label fw-bold">Tên sản phẩm</label> <input
+								type="text" class="form-control" id="proName" required>
+						</div>
+						<div class="mb-3">
+							<label class="form-label fw-bold">Danh mục</label> <select
+								class="form-select" id="proCategory"></select>
+						</div>
+						<div class="row">
+							<div class="col-6 mb-3">
+								<label class="form-label fw-bold">Giá bán</label> <input
+									type="number" class="form-control" id="proPrice" value="0">
+							</div>
+							<div class="col-6 mb-3">
+								<label class="form-label fw-bold">Số lượng</label> <input
+									type="number" class="form-control" id="proQty" value="1">
+							</div>
+						</div>
+						<div class="mb-3">
+							<label class="form-label fw-bold">Hình ảnh</label> <input
+								type="file" class="form-control" id="proImagesFile"
+								accept="image/*">
+							<!-- Thẻ ẩn lưu tên file cũ để giữ lại ảnh nếu lúc Sửa không chọn ảnh mới -->
+							<input type="hidden" id="proImagesHidden" value="default.jpg">
+						</div>
+					</form>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary"
+						data-bs-dismiss="modal">Đóng</button>
+					<button type="button" class="btn btn-danger"
+						onclick="saveProduct()">Lưu dữ liệu</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+    let globalProducts = [];
+    let isEditMode = false; 
+
+    function fetchGraphQL(query, variables = {}) {
+        return $.ajax({
+            url: '/graphql',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ query: query, variables: variables })
+        });
+    }
+
+    function loadCategories() {
+        const q = `query { getAllCategories { categoryId categoryName } }`;
+        fetchGraphQL(q).done(res => {
+            let options = '';
+            res.data.getAllCategories.forEach(c => {
+                options += `<option value="${c.categoryId}">${c.categoryName}</option>`;
+            });
+            $('#proCategory').html(options);
+        });
+    }
+
+    function loadAdminProducts() {
+        const q = `
+            query {
+                getAllProducts {
+                    productId productName unitPrice images quantity
+                    category { categoryId }
+                }
+            }
+        `;
+        fetchGraphQL(q).done(function(res) {
+            globalProducts = res.data.getAllProducts;
+            let html = '';
+            globalProducts.forEach(p => {
+                let img = p.images ? `/uploads/${p.images}` : 'https://via.placeholder.com/50';
+                html += `
+                    <tr>
+                        <td class="fw-bold">${p.productId}</td>
+                        <td><img src="${img}" width="60" height="60" style="object-fit:cover; border-radius:5px;"></td>
+                        <td class="text-primary fw-bold">${p.productName}</td>
+                        <td class="text-danger fw-bold" data-order="${p.unitPrice}">${p.unitPrice.toLocaleString('vi-VN')} đ</td>
+                        <td>${p.quantity}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm me-1" onclick="openEditModal(${p.productId})">Sửa</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.productId})">Xóa</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            let table = $('#productTable').DataTable();
+            table.destroy(); 
+            $('#product-tbody').html(html);
+            
+            $('#productTable').DataTable({
+                language: { search: "🔍 Tìm kiếm:", lengthMenu: "Hiển thị _MENU_", info: "Đang xem _START_ đến _END_ trong _TOTAL_" }
+            });
+        });
+    }
+
+    function openAddModal() {
+        isEditMode = false;
+        $('#modalTitle').text("Thêm Sản Phẩm Mới");
+        $('#formProduct')[0].reset();
+        $('#proImagesHidden').val("default.jpg");
+    }
+
+    function openEditModal(id) {
+        isEditMode = true;
+        $('#modalTitle').text("Cập nhật Sản Phẩm");
+        let p = globalProducts.find(x => x.productId == id);
+        if(p) {
+            $('#proId').val(p.productId);
+            $('#proName').val(p.productName);
+            $('#proPrice').val(p.unitPrice);
+            $('#proQty').val(p.quantity);
+            if(p.category) $('#proCategory').val(p.category.categoryId);
+            
+            // Xóa file chọn cũ và lưu tên ảnh cũ vào thẻ ẩn
+            $('#proImagesFile').val('');
+            $('#proImagesHidden').val(p.images || "default.jpg");
+            
+            $('#modalProduct').modal('show');
+        }
+    }
+
+    // Hàm gọi lưu dữ liệu (Dùng async/await để đợi upload file)
+    async function saveProduct() {
+        let finalImageName = $('#proImagesHidden').val(); // Tên mặc định là ảnh cũ
+        let fileInput = $('#proImagesFile')[0].files[0];
+
+        // 1. NẾU CÓ CHỌN FILE ẢNH MỚI THÌ CALL API UPLOAD LẤY TÊN
+        if(fileInput) {
+            let formData = new FormData();
+            formData.append("file", fileInput);
+            try {
+                finalImageName = await $.ajax({
+                    url: '/upload',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false
+                });
+            } catch(e) {
+                alert("Lỗi tải ảnh lên!");
+                return;
+            }
+        }
+
+        // 2. GỌI GRAPHQL MUTATION LƯU VÀO DATABASE
+        let payload = {
+            productName: $('#proName').val(),
+            unitPrice: parseFloat($('#proPrice').val()),
+            quantity: parseInt($('#proQty').val()),
+            categoryId: parseInt($('#proCategory').val()),
+            images: finalImageName, // Đã lấy được tên ảnh xịn
+            discount: 0,
+            status: 1,
+            description: ""
+        };
+
+        let mutationQuery = "";
+        
+        if(isEditMode) {
+            payload.productId = $('#proId').val();
+            mutationQuery = `mutation UpdateProduct($input: ProductInput!) { updateProduct(product: $input) { productId } }`;
+        } else {
+            mutationQuery = `mutation CreateProduct($input: ProductInput!) { createProduct(product: $input) { productId } }`;
+        }
+
+        fetchGraphQL(mutationQuery, { input: payload }).done(function(res) {
+            $('#modalProduct').modal('hide');
+            loadAdminProducts(); 
+        });
+    }
+
+    function deleteProduct(id) {
+        if(confirm("Xóa sản phẩm này nhé?")) {
+            const q = `mutation { deleteProduct(productId: ${id}) }`;
+            fetchGraphQL(q).done(function(res) {
+                loadAdminProducts(); 
+            });
+        }
+    }
+
+    $(document).ready(function() {
+        loadCategories();
+        loadAdminProducts();
+    });
+</script>
+
+</body>
+</html>
